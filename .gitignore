@@ -1,0 +1,31 @@
+# Local-only remote-access runbook (never pushed)
+remote/
+
+# Logs and media files
+logs/
+media/
+*.log
+
+# Debug files
+media/debug/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Raspberry Pi specific
+.DS_Store
+
+# Temporary / recovery scratch
+*.tmp
+*.temp
+app copy.py
+*_files_within*.txt
+
+# Recovered-but-not-shipped (dev helpers, tests, demos)
+_recovered_extras/

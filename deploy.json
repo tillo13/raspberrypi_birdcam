@@ -1,0 +1,6 @@
+{
+  "project_name": "raspberrypi_birdcam",
+  "github_repo": "https://github.com/tillo13/raspberrypi_birdcam.git",
+  "git_only": true,
+  "private_repo": false
+}
