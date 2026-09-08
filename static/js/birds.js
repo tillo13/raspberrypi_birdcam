@@ -97,10 +97,6 @@ async function takePhoto() {
     }
 }
 
-// Update to birds.js
-
-// Find the toggleLiveMode() function in birds.js and update it to:
-
 async function toggleLiveMode() {
     if (!isLiveMode) {
         // Start live mode
@@ -114,10 +110,10 @@ async function toggleLiveMode() {
         photoBtn.disabled = true;
         recordBtn.disabled = true;
         
-        // Update image immediately
-        updateLiveImage();
-        // Then update every 2 seconds
-        liveInterval = setInterval(updateLiveImage, 500);
+        // Stream MJPEG straight into the <img> — no polling
+        previewImage.src = '/api/stream';
+        previewImage.classList.add('active');
+        noImageMessage.style.display = 'none';
     } else {
         // Stop live mode
         isLiveMode = false;
@@ -130,12 +126,9 @@ async function toggleLiveMode() {
         photoBtn.disabled = false;
         recordBtn.disabled = false;
         
-        // Clear the interval
-        if (liveInterval) {
-            clearInterval(liveInterval);
-            liveInterval = null;
-        }
-        
+        // Stop the MJPEG stream (closes the server-side connection)
+        previewImage.src = '';
+
         // Stop the live mode animation on the Sense HAT
         try {
             await fetch('/api/stop_live_mode', { method: 'POST' });
@@ -148,30 +141,6 @@ async function toggleLiveMode() {
     }
 }
 
-async function updateLiveImage() {
-    if (!isLiveMode) return;
-    
-    console.log('Updating live image...', new Date().toLocaleTimeString());
-    
-    try {
-        // Add timestamp to prevent caching
-        const response = await fetch('/api/live_snapshot?t=' + Date.now());
-        const data = await response.json();
-        
-        if (data.success && isLiveMode) {
-            // Force browser to update by creating new image
-            const newImage = new Image();
-            newImage.onload = function() {
-                previewImage.src = this.src;
-                previewImage.classList.add('active');
-                noImageMessage.style.display = 'none';
-            };
-            newImage.src = data.image;
-        }
-    } catch (error) {
-        console.error('Error updating live image:', error);
-    }
-}
 
 async function toggleRecording() {
     recordBtn.disabled = true;

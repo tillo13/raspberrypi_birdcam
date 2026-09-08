@@ -1,0 +1,14 @@
+# Bird Cam dependencies.
+#
+# On Raspberry Pi OS (Bookworm) the camera/vision/HAT packages carry C and
+# hardware bindings, so install them with apt rather than pip:
+#
+#   sudo apt install -y python3-picamera2 python3-opencv sense-hat \
+#                       python3-waitress ffmpeg
+#
+# For reference, the pinned Python packages this was built and verified against:
+flask==2.2.2
+waitress==2.1.2
+numpy==1.24.2
+opencv-python==4.6.0      # provided by apt python3-opencv on the Pi
+picamera2==0.3.27         # provided by apt python3-picamera2 on the Pi

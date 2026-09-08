@@ -7,14 +7,13 @@ view and controls from any browser on your network.
 **What it strives to do** — turn a Pi, a camera, and a Sense HAT into a tiny always-on
 nature station: reliable motion capture with as few false triggers as possible,
 light enough to run 24/7 on a Pi 3, and simple enough to check from your phone on the
-couch. The near-term aim is to modernize the capture pipeline (picamera2), clean up
-the paths, and pin dependencies so it's clone-and-run on a fresh Pi.
+couch.
 
 ## Features
-- **Live view** — on-demand snapshots from the Pi camera, straight in the browser.
-- **Motion capture** — OpenCV frame-differencing with tunable threshold, minimum
+- **Live view** — a smooth MJPEG stream straight into the browser.
+- **Motion capture** — MOG2 background subtraction with tunable sensitivity, minimum
   area, cooldown, and consecutive-frame confirmation; saves a still on each trigger.
-- **Manual photo & video** — one-tap capture and timed recording.
+- **Manual photo & video** — one-tap capture and recording (video written to mp4).
 - **Sense HAT** — temperature / humidity / pressure logging and an 8x8 LED-matrix
   display for countdowns and status.
 - **Web control panel** — start/stop motion, tune settings, and browse captures from
@@ -26,38 +25,45 @@ the paths, and pin dependencies so it's clone-and-run on a fresh Pi.
 - Sense HAT
 
 ## How it works
-- **Camera:** frames captured by shelling out to `libcamera-still` / `libcamera-vid`.
-- **Motion:** `utilities/motion_utils.py` — OpenCV diff against a rolling reference.
-- **Sensors / LED:** `utilities/sensehat_utils.py` — Sense HAT readings + matrix output.
-- **Web / API:** `app.py` — Flask, serves the UI and a small JSON API on port 5000.
+- **Camera** (`utilities/camera.py`) — one persistent `picamera2` camera. A single
+  background thread pulls low-res frames that motion detection and the live stream
+  share, while photos and video pull from the high-res stream. No per-frame subprocess.
+- **Motion** (`utilities/motion.py`) — MOG2 background subtraction, which tolerates
+  gradual outdoor light changes (clouds, dawn) far better than frame differencing.
+- **Live view** — an MJPEG stream at `/api/stream`, rendered straight into an `<img>`.
+- **Sensors / LED** (`utilities/sensehat_utils.py`) — Sense HAT readings + matrix output.
+- **Web / API** (`app.py`) — Flask app + JSON API, served by **waitress** on port 5000.
 
 ## Setup
 ```bash
-# System (Raspberry Pi OS Bookworm)
-sudo apt install -y libcamera-apps python3-opencv sense-hat
-
-# Python
-pip install flask numpy
+# System packages (Raspberry Pi OS Bookworm)
+sudo apt install -y python3-picamera2 python3-opencv sense-hat python3-waitress ffmpeg
 
 python app.py            # serves on http://0.0.0.0:5000
 ```
 
+### Run as a service
+```bash
+sudo cp birdcam.service /etc/systemd/system/
+sudo systemctl enable --now birdcam
+```
+
 ## API
-`/api/live_snapshot` · `/api/take_photo` · `/api/start_recording` · `/api/stop_recording`
+`/api/stream` (MJPEG) · `/api/take_photo` · `/api/start_recording` · `/api/stop_recording`
 · `/api/start_motion` · `/api/stop_motion` · `/api/motion_status` · `/api/motion_settings`
 · `/api/list_files` · `/api/counts` · `/api/latest_image` · `/files/<name>`
 
 ## Layout
 ```
-app.py                      Flask app + API
-utilities/motion_utils.py   camera capture + OpenCV motion detection
+app.py                      Flask app + JSON API + MJPEG stream (waitress)
+config.py                   paths, port, motion/display defaults
+utilities/camera.py         persistent picamera2 camera (frames, photo, video, stream)
+utilities/motion.py         MOG2 motion detection
 utilities/sensehat_utils.py Sense HAT sensors + LED matrix
 templates/index.html        web UI
 static/                     css + js
-test_*.py                   hardware sanity checks (motion, orientation, sensehat)
+birdcam.service             systemd unit
 ```
 
-## Roadmap
-- Camera pipeline off the `libcamera-*` CLI → in-process **picamera2** (or Bookworm's
-  `rpicam-*` tools).
-- Cleaner paths, a pinned `requirements.txt`, and a systemd unit for boot-time start.
+## Ideas
+- Optional on-device classification to tell birds from a swaying branch.

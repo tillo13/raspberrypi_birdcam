@@ -1,0 +1,14 @@
+[Unit]
+Description=Bird Cam Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=mac
+WorkingDirectory=/home/mac/Desktop/birdcam
+ExecStart=/usr/bin/python3 -u /home/mac/Desktop/birdcam/app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
