@@ -384,3 +384,52 @@ def show_random_display():
     """Placeholder function - does nothing"""
     # This function is called by app.py but we don't want random displays
     pass
+
+# --- Scrolling text -----------------------------------------------------------
+# show_message() blocks for the whole scroll, so callers get a worker thread and a
+# lock: two messages queue instead of fighting over the matrix, and neither one
+# stalls a web request. The recording/live animations own the display while they
+# run, so a scroll defers to them rather than interleaving.
+
+_scroll_lock = threading.Lock()
+_scrolling = False
+
+
+def is_scrolling():
+    return _scrolling
+
+
+def scroll_text(text, colour=WHITE, speed=0.06, block=False):
+    """Scroll a short message across the matrix. Non-blocking by default."""
+    global _scrolling
+
+    def run():
+        global _scrolling
+        with _scroll_lock:
+            if recording_active or live_mode_active:
+                return
+            _scrolling = True
+            try:
+                ensure_rotation()
+                sense.show_message(str(text)[:64], text_colour=colour,
+                                   scroll_speed=speed)
+                clear_display()
+            except Exception as e:
+                logger.error(f"scroll_text failed: {e}")
+            finally:
+                _scrolling = False
+
+    if block:
+        run()
+    else:
+        threading.Thread(target=run, daemon=True).start()
+
+
+def show_bird_name(name):
+    """Announce an identified bird across the matrix."""
+    scroll_text(name, colour=GREEN)
+
+
+def show_conditions(temp_c, humidity):
+    """Scroll the current ambient reading, e.g. '18C 62%'."""
+    scroll_text(f"{round(temp_c)}C {round(humidity)}%", colour=CYAN)

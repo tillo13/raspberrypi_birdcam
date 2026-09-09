@@ -1,190 +1,50 @@
-/* Motion detection styles for Bird Cam */
+/* Motion detection settings dialog — shares the house tokens from style.css. */
 
-/* Motion button styling */
-.btn-motion {
-    background-color: #6c5ce7;
-    border-color: #5a49e6;
-}
-
-.btn-motion:hover {
-    background-color: #5a49e6;
-}
-
-.btn-motion.active {
-    background-color: #e74c3c;
-    border-color: #c0392b;
-}
-
-.btn-motion.active:hover {
-    background-color: #c0392b;
-}
-
-/* Motion indicator */
-.motion-indicator {
-    display: none;
-    align-items: center;
-    padding: 0.3rem 0.8rem;
-    background-color: #6c5ce7;
-    border-radius: 1rem;
-    color: white;
-    font-weight: 500;
-    font-size: 0.9rem;
-    margin-left: 1rem;
-}
-
-.motion-indicator.active {
-    display: flex;
-}
-
-.motion-indicator .pulse {
-    width: 0.5rem;
-    height: 0.5rem;
-    background-color: #ff0000;
-    border-radius: 50%;
-    margin-right: 0.5rem;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    50% {
-        opacity: 0.5;
-        transform: scale(1.5);
-    }
-    100% {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-/* Motion settings dialog */
 .motion-settings-dialog {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
+  position: fixed; inset: 0; z-index: 100;
+  display: none; place-items: center; padding: 20px;
+  background: rgba(10, 14, 18, .55); backdrop-filter: blur(4px);
 }
-
-.motion-settings-dialog.active {
-    display: flex;
-}
+.motion-settings-dialog.active { display: grid; animation: rise .2s both; }
 
 .motion-settings-content {
-    background-color: white;
-    border-radius: 0.5rem;
-    max-width: 500px;
-    width: 90%;
-    padding: 1.5rem;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  width: 100%; max-width: 440px;
+  background: var(--bg-1); border: 1px solid var(--border-1);
+  border-radius: var(--radius); box-shadow: var(--shadow-2); overflow: hidden;
 }
 
 .motion-settings-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 0.5rem;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px; border-bottom: 1px solid var(--border-1);
 }
-
-.motion-settings-header h3 {
-    margin: 0;
-    font-size: 1.2rem;
-}
-
+.motion-settings-header h3 { font-size: 1.05rem; font-weight: 700; letter-spacing: -.01em; }
 .motion-settings-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: #666;
+  background: none; border: none; cursor: pointer;
+  font-size: 1.5rem; line-height: 1; color: var(--text-3); transition: color .2s;
 }
+.motion-settings-close:hover { color: var(--text-1); }
 
-.motion-settings-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.motion-settings-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.3rem;
-}
-
-.motion-settings-group label {
-    font-weight: 500;
-    font-size: 0.9rem;
-}
-
-.motion-settings-group small {
-    color: #666;
-    font-size: 0.8rem;
-}
-
+.motion-settings-form { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+.motion-settings-group { display: flex; flex-direction: column; gap: 6px; }
+.motion-settings-group label { font-size: .85rem; font-weight: 600; color: var(--text-1); }
 .motion-settings-group input {
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 0.3rem;
+  font-family: var(--mono); font-size: .95rem; font-variant-numeric: tabular-nums;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--bg-2); color: var(--text-1); border: 1px solid var(--border-2);
+  transition: border-color .2s, box-shadow .2s;
 }
-
-.motion-settings-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1rem;
+.motion-settings-group input:focus-visible {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
+.motion-settings-group small { font-size: .74rem; color: var(--text-3); }
 
+.motion-settings-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 .motion-settings-actions button {
-    padding: 0.5rem 1rem;
-    border-radius: 0.3rem;
-    border: none;
-    cursor: pointer;
-    font-weight: 500;
+  padding: 9px 18px; border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--sans); font-size: .85rem; font-weight: 600; transition: all .2s;
 }
-
-.motion-settings-actions button.cancel {
-    background-color: #eee;
-    color: #333;
-}
-
-.motion-settings-actions button.save {
-    background-color: #6c5ce7;
-    color: white;
-}
-
-/* Motion settings button */
-.motion-settings-button {
-    background: none;
-    border: none;
-    font-size: 1.2rem;
-    cursor: pointer;
-    color: #6c5ce7;
-    margin-left: 0.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    transition: background-color 0.2s;
-}
-
-.motion-settings-button:hover {
-    background-color: rgba(108, 92, 231, 0.1);
-}
-
-/* File item styling for motion captures */
-.file-item .file-type.motion-photo,
-.file-item .file-type.motion-video {
-    background-color: #6c5ce7;
-}
+.motion-settings-actions .cancel { background: var(--bg-2); color: var(--text-2); border: 1px solid var(--border-1); }
+.motion-settings-actions .cancel:hover { border-color: var(--border-2); color: var(--text-1); }
+.motion-settings-actions .save { background: var(--accent); color: var(--accent-ink); border: 1px solid transparent; }
+.motion-settings-actions .save:hover { background: var(--accent-hover); }

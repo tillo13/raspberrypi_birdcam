@@ -202,6 +202,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (closeSettingsBtn) {
         closeSettingsBtn.addEventListener('click', closeMotionSettings);
     }
+
+    const cancelSettingsBtn = document.getElementById('cancelMotionSettingsBtn');
+    if (cancelSettingsBtn) {
+        cancelSettingsBtn.addEventListener('click', closeMotionSettings);
+    }
     
     // Check if motion mode is active on load
     fetch('/api/motion_status')

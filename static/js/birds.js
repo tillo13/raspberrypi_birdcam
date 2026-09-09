@@ -14,6 +14,7 @@ const status = document.getElementById('status');
 const photoCount = document.getElementById('photoCount');
 const videoCount = document.getElementById('videoCount');
 const fileList = document.getElementById('fileList');
+const motionCount = document.getElementById('motionCount');
 const previewImage = document.getElementById('previewImage');
 const noImageMessage = document.getElementById('noImageMessage');
 const liveIndicator = document.getElementById('liveIndicator');
@@ -224,6 +225,7 @@ async function updateCounts() {
         
         photoCount.textContent = data.photo_count;
         videoCount.textContent = data.video_count;
+        motionCount.textContent = data.motion_count;
     } catch (error) {
         console.error('Error updating counts:', error);
     }

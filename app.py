@@ -16,7 +16,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 import config
-from utilities import camera, motion, sensehat_utils
+from utilities import camera, motion, sensehat_utils, timelapse, visits, weather
 
 
 class BirdCam:
@@ -28,8 +28,9 @@ class BirdCam:
         self.motion = motion.MotionDetector()
         self.last_motion_capture = None
         self.last_motion_time = 0.0
-        self._rec_name = None
-        self._last_random = 0.0
+        self._last_conditions = 0.0
+        self._clip_lock = threading.Lock()
+        self._clip_active = False
         self._display_on = True
         sensehat_utils.clear_display()
         sensehat_utils.show_startup_message()
@@ -38,11 +39,15 @@ class BirdCam:
     def _display_loop(self):
         while self._display_on:
             try:
-                if not self.camera.recording and not self.motion.active:
-                    if time.time() - self._last_random > config.RANDOM_DISPLAY_INTERVAL:
-                        sensehat_utils.show_random_display()
-                        self._last_random = time.time()
-                    sensehat_utils.always_on_display()
+                if (not self.camera.recording and not self.motion.active
+                        and not sensehat_utils.is_scrolling()):
+                    if time.time() - self._last_conditions > config.RANDOM_DISPLAY_INTERVAL:
+                        now = weather.read()
+                        if now:
+                            sensehat_utils.show_conditions(now["temp_c"], now["humidity"])
+                        self._last_conditions = time.time()
+                    else:
+                        sensehat_utils.always_on_display()
             except Exception:
                 pass
             time.sleep(5)
@@ -65,10 +70,11 @@ class BirdCam:
         return True
 
     def stop_recording(self):
+        path = self.camera.rec_path
         if not self.camera.stop_recording():
             return None
         sensehat_utils.show_recording_success()
-        return self.list_files()[0] if self.list_files() else None
+        return Path(path).name if path else None
 
     def start_motion(self):
         if self.motion.start(self._on_motion):
@@ -86,6 +92,32 @@ class BirdCam:
         name = Path(self.camera.capture_photo(self._media_path("_motion.jpg"))).name
         self.last_motion_capture = name
         self.last_motion_time = time.time()
+        visits.log_event(name, weather.read())
+        self._start_motion_clip()
+
+    def _start_motion_clip(self):
+        """Record the seconds after a trigger, unless something already has the encoder.
+
+        A manual recording wins: the button the user pressed outranks the bird. The
+        motion cooldown (2s) is shorter than a clip (10s), so further triggers during
+        one are absorbed rather than queued — the clip already covers them.
+        """
+        with self._clip_lock:
+            if self._clip_active or self.camera.recording:
+                return
+            self._clip_active = True
+
+        def run():
+            try:
+                self.camera.record_video(self._media_path("_motion.mp4"),
+                                         config.MOTION_RECORD_SECONDS)
+            except Exception as e:
+                logging.getLogger(__name__).error("motion clip failed: %s", e)
+            finally:
+                with self._clip_lock:
+                    self._clip_active = False
+
+        threading.Thread(target=run, daemon=True).start()
 
     def _media_files(self):
         if not config.MEDIA_DIR.exists():
@@ -95,14 +127,20 @@ class BirdCam:
     def counts(self):
         files = self._media_files()
         return {
-            "photo_count": sum(1 for f in files if f.endswith(".jpg")),
-            "video_count": sum(1 for f in files if f.endswith((".mp4", ".h264"))),
-            "motion_count": sum(1 for f in files if "_motion" in f),
+            "photo_count": sum(1 for f in files
+                               if f.endswith(".jpg") and "_motion" not in f),
+            "video_count": sum(1 for f in files
+                               if f.endswith((".mp4", ".h264")) and "_motion" not in f),
+            "motion_count": sum(1 for f in files
+                                if "_motion" in f and f.endswith(".jpg")),
         }
 
+    def all_files(self):
+        return [f for f in self._media_files()
+                if f.endswith((".jpg", ".mp4", ".h264"))]
+
     def list_files(self):
-        files = [f for f in self._media_files() if f.endswith((".jpg", ".mp4", ".h264"))]
-        return sorted(files, reverse=True)[:30]
+        return sorted(self.all_files(), reverse=True)[:30]
 
     def latest_image(self):
         imgs = [f for f in self._media_files() if f.endswith(".jpg")]
@@ -110,6 +148,16 @@ class BirdCam:
             return None
         imgs.sort(key=lambda f: os.path.getmtime(config.MEDIA_DIR / f), reverse=True)
         return imgs[0]
+
+
+def _parse_day(value):
+    """'YYYY-MM-DD' to a date, or None for today."""
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _setup_logging(app):
@@ -224,6 +272,42 @@ def create_app(bc=None):
     def force_random_display():
         sensehat_utils.show_random_display()
         return jsonify(success=True, message="Random display shown")
+
+    @app.route("/api/weather")
+    def api_weather():
+        now = weather.read()
+        if now is None:
+            return jsonify(success=False, message="Sensors unavailable")
+        return jsonify(success=True, **now)
+
+    @app.route("/api/visits")
+    def api_visits():
+        files = bc.all_files()
+        day = request.args.get("day")
+        return jsonify(success=True,
+                       visits=visits.build(files),
+                       hours=visits.histogram(files, _parse_day(day)),
+                       day=day or datetime.now().date().isoformat(),
+                       days=visits.days_with_motion(files))
+
+    @app.route("/api/timelapse", methods=["POST"])
+    def api_timelapse():
+        day = (request.json or {}).get("day") or datetime.now().date().isoformat()
+        ok, message = timelapse.start(day, bc.all_files())
+        return jsonify(success=ok, message=message)
+
+    @app.route("/api/timelapse_status")
+    def api_timelapse_status():
+        return jsonify(success=True, **timelapse.status())
+
+    @app.route("/api/say", methods=["POST"])
+    def api_say():
+        """Scroll a short message across the Sense HAT."""
+        text = (request.json or {}).get("text", "").strip()
+        if not text:
+            return jsonify(success=False, message="Nothing to say")
+        sensehat_utils.scroll_text(text[:64])
+        return jsonify(success=True, message=f"Scrolling: {text[:64]}")
 
     @app.route("/files/<path:filename>")
     def serve_file(filename):

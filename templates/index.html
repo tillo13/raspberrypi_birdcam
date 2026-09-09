@@ -3,155 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bird Cam Control</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/motion.css">
+    <title>Bird Cam</title>
+    <meta name="description" content="Self-hosted Raspberry Pi bird-watching camera — live view, motion capture, and controls.">
+    <!-- FOUC guard: set theme before first paint -->
+    <script>
+      try { var t = localStorage.getItem('birdcam-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
+    <link rel="stylesheet" href="/static/css/motion.css?v=3">
 </head>
 <body>
     <div class="app-container">
         <header class="app-header">
-            <div class="header-content">
-                <h1><span class="emoji">🦜</span> Bird Cam</h1>
+            <h1><span class="emoji">🦜</span> Bird&nbsp;Cam</h1>
+            <div class="header-right">
                 <div class="indicators">
-                    <div class="live-indicator" id="liveIndicator">
-                        <span class="pulse"></span>
-                        <span>Live</span>
-                    </div>
-                    <div class="motion-indicator" id="motionIndicator">
-                        <span class="pulse"></span>
-                        <span>Motion</span>
-                    </div>
+                    <div class="live-indicator" id="liveIndicator"><span class="pulse"></span><span>Live</span></div>
+                    <div class="motion-indicator" id="motionIndicator"><span class="pulse"></span><span>Motion</span></div>
                 </div>
+                <button id="themeToggle" class="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">🌙</button>
             </div>
         </header>
-        
+
         <main class="app-main">
-            <!-- Preview Section -->
             <section class="preview-section">
-                <div class="preview-wrapper">
-                    <div class="preview-container" id="previewContainer">
-                        <img id="previewImage" class="preview-image" src="" alt="Bird Cam View">
-                        <div id="noImageMessage" class="no-image-overlay">
-                            <div class="no-image-content">
-                                <span class="emoji-large">📷</span>
-                                <p>Initializing camera...</p>
-                            </div>
-                        </div>
-                        <div class="preview-overlay" id="previewOverlay">
-                            <div class="loading-spinner"></div>
+                <div class="preview-container" id="previewContainer">
+                    <img id="previewImage" class="preview-image" src="" alt="Bird Cam view">
+                    <div id="noImageMessage" class="no-image-overlay">
+                        <div class="no-image-content">
+                            <span class="emoji-large">📷</span>
+                            <p>Press <strong>Live Mode</strong> to start the stream</p>
                         </div>
                     </div>
+                    <div class="preview-overlay" id="previewOverlay"><div class="loading-spinner"></div></div>
                 </div>
             </section>
-            
-            <!-- Control Buttons -->
+
             <section class="controls-section">
                 <div class="controls-grid">
-                    <button id="photoBtn" class="control-btn btn-photo">
-                        <span class="btn-icon">📸</span>
-                        <span class="btn-text">Take Photo</span>
-                    </button>
-                    <button id="recordBtn" class="control-btn btn-record">
-                        <span class="btn-icon">🎥</span>
-                        <span class="btn-text">Start Recording</span>
-                    </button>
-                    <button id="liveBtn" class="control-btn btn-live">
-                        <span class="btn-icon">👁️</span>
-                        <span class="btn-text">Live Mode</span>
-                    </button>
-                    <button id="motionBtn" class="control-btn btn-motion">
-                        <span class="btn-icon">👁️</span>
-                        <span class="btn-text">Motion Mode</span>
-                    </button>
+                    <button id="photoBtn" class="control-btn btn-photo"><span class="btn-icon">📸</span><span class="btn-text">Take Photo</span></button>
+                    <button id="recordBtn" class="control-btn btn-record"><span class="btn-icon">🎥</span><span class="btn-text">Start Recording</span></button>
+                    <button id="liveBtn" class="control-btn btn-live"><span class="btn-icon">👁️</span><span class="btn-text">Live Mode</span></button>
+                    <button id="motionBtn" class="control-btn btn-motion"><span class="btn-icon">🐦</span><span class="btn-text">Motion Mode</span></button>
                 </div>
             </section>
-            
-            <!-- Stats Section -->
+
+            <section class="conditions-section">
+                <div class="conditions" id="conditions" hidden>
+                    <div class="condition"><span class="condition-icon">🌡️</span><span class="condition-value" id="condTemp">--</span></div>
+                    <div class="condition"><span class="condition-icon">💧</span><span class="condition-value" id="condHumidity">--</span></div>
+                    <div class="condition"><span class="condition-icon">🧭</span><span class="condition-value" id="condPressure">--</span></div>
+                    <button id="condSay" class="condition-say" title="Scroll this on the Sense HAT">Say it →</button>
+                    <span class="condition-note" id="condNote" title="">est.</span>
+                </div>
+            </section>
+
             <section class="stats-section">
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">📸</div>
-                        <div class="stat-content">
-                            <div class="stat-value" id="photoCount">0</div>
-                            <div class="stat-label">Photos</div>
-                        </div>
+                        <div class="stat-content"><div class="stat-value" id="photoCount">0</div><div class="stat-label">Photos</div></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-icon">🎥</div>
-                        <div class="stat-content">
-                            <div class="stat-value" id="videoCount">0</div>
-                            <div class="stat-label">Videos</div>
-                        </div>
+                        <div class="stat-content"><div class="stat-value" id="videoCount">0</div><div class="stat-label">Videos</div></div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon">👁️</div>
-                        <div class="stat-content">
-                            <div class="stat-value" id="motionCount">0</div>
-                            <div class="stat-label">Motion</div>
-                        </div>
+                        <div class="stat-icon">🐦</div>
+                        <div class="stat-content"><div class="stat-value" id="motionCount">0</div><div class="stat-label">Motion</div></div>
                     </div>
                 </div>
             </section>
-            
-            <!-- Status Bar -->
+
             <section class="status-section">
-                <div id="status" class="status-bar">
-                    <span class="status-text">Initializing...</span>
+                <div id="status" class="status-bar"><span class="status-text">Initializing…</span></div>
+            </section>
+
+            <section class="visits-section">
+                <div class="section-header">
+                    <div class="header-title">
+                        <h2>Bird Visits</h2>
+                        <span class="visits-summary" id="visitsSummary"></span>
+                    </div>
+                    <button id="timelapseBtn" class="refresh-btn"><span>🎬</span><span>Timelapse</span></button>
+                </div>
+                <div class="activity-card">
+                    <div class="activity-head">
+                        <span class="activity-title">Today’s activity</span>
+                        <span class="activity-peak" id="activityPeak"></span>
+                    </div>
+                    <div class="activity-strip" id="activityStrip"></div>
+                    <div class="activity-axis"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>11p</span></div>
+                </div>
+                <div id="visitList" class="visit-list">
+                    <div class="loading-message"><div class="loading-spinner"></div><p>Loading visits…</p></div>
                 </div>
             </section>
-            
-            <!-- Gallery Section -->
+
             <section class="gallery-section">
                 <div class="section-header">
                     <div class="header-title">
                         <h2>Recent Captures</h2>
-                        <button id="motionSettingsBtn" class="motion-settings-button" title="Motion Settings">⚙️</button>
+                        <button id="motionSettingsBtn" class="motion-settings-button" title="Motion settings" aria-label="Motion settings">⚙️</button>
                     </div>
-                    <button id="refreshBtn" class="refresh-btn">
-                        <span>🔄</span>
-                        <span>Refresh</span>
-                    </button>
+                    <button id="refreshBtn" class="refresh-btn"><span>🔄</span><span>Refresh</span></button>
                 </div>
                 <div id="fileList" class="file-grid">
-                    <div class="loading-message">
-                        <div class="loading-spinner"></div>
-                        <p>Loading files...</p>
-                    </div>
+                    <div class="loading-message"><div class="loading-spinner"></div><p>Loading captures…</p></div>
                 </div>
             </section>
         </main>
     </div>
-    
-    <!-- Motion Settings Dialog -->
+
     <div id="motionSettingsDialog" class="motion-settings-dialog">
         <div class="motion-settings-content">
             <div class="motion-settings-header">
-                <h3>Motion Detection Settings</h3>
-                <button id="closeMotionSettingsBtn" class="motion-settings-close">&times;</button>
+                <h3>Motion Detection</h3>
+                <button id="closeMotionSettingsBtn" class="motion-settings-close" aria-label="Close">&times;</button>
             </div>
             <div class="motion-settings-form">
                 <div class="motion-settings-group">
-                    <label for="motion-threshold">Threshold</label>
+                    <label for="motion-threshold">Sensitivity threshold</label>
                     <input type="number" id="motion-threshold" min="5" max="100" value="25">
-                    <small>Lower values = more sensitive (5-100)</small>
+                    <small>Lower = more sensitive (5–100)</small>
                 </div>
                 <div class="motion-settings-group">
-                    <label for="motion-min-area">Minimum Area</label>
-                    <input type="number" id="motion-min-area" min="100" max="5000" value="500">
-                    <small>Minimum pixel area to trigger (100-5000)</small>
+                    <label for="motion-min-area">Minimum area</label>
+                    <input type="number" id="motion-min-area" min="100" max="5000" value="400">
+                    <small>Minimum changed pixels to trigger (100–5000)</small>
                 </div>
                 <div class="motion-settings-group">
-                    <label for="motion-cooldown">Cooldown (seconds)</label>
+                    <label for="motion-cooldown">Cooldown</label>
                     <input type="number" id="motion-cooldown" min="1" max="30" step="0.5" value="2">
-                    <small>Seconds between triggers (1-30)</small>
+                    <small>Seconds between triggers (1–30)</small>
                 </div>
                 <div class="motion-settings-group">
-                    <label for="motion-consecutive-frames">Consecutive Frames</label>
-                    <input type="number" id="motion-consecutive-frames" min="1" max="10" value="3">
-                    <small>Number of frames with motion to trigger (1-10)</small>
+                    <label for="motion-consecutive-frames">Consecutive frames</label>
+                    <input type="number" id="motion-consecutive-frames" min="1" max="10" value="2">
+                    <small>Frames of motion in a row before firing (1–10)</small>
                 </div>
                 <div class="motion-settings-actions">
                     <button id="cancelMotionSettingsBtn" class="cancel">Cancel</button>
@@ -160,9 +152,27 @@
             </div>
         </div>
     </div>
-    
-    <!-- JavaScript -->
-    <script src="/static/js/birds.js"></script>
-    <script src="/static/js/motion.js"></script>
+
+    <script>
+      (function () {
+        var btn = document.getElementById('themeToggle');
+        function sync() {
+          var dark = document.documentElement.getAttribute('data-theme') === 'dark'
+            || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme: dark)').matches);
+          btn.textContent = dark ? '☀️' : '🌙';
+        }
+        btn.addEventListener('click', function () {
+          var next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          try { localStorage.setItem('birdcam-theme', next); } catch (e) {}
+          sync();
+        });
+        sync();
+      })();
+    </script>
+    <script src="/static/js/birds.js?v=3"></script>
+    <script src="/static/js/motion.js?v=3"></script>
+    <script src="/static/js/weather.js?v=3"></script>
+    <script src="/static/js/visits.js?v=3"></script>
 </body>
 </html>
