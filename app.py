@@ -172,6 +172,8 @@ def _setup_logging(app):
 
 def create_app(bc=None):
     app = Flask(__name__)
+    from utilities.csrf_guard import install as install_csrf_guard
+    install_csrf_guard(app)  # refuse cross-site POSTs; session cookie SameSite=Lax (audit 2026-10-14)
     _setup_logging(app)
     bc = bc or BirdCam()
     app.logger.info("Bird Cam startup")
