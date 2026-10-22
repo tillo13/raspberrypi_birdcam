@@ -5,6 +5,7 @@ State lives on one BirdCam controller (camera, motion detector, Sense HAT displa
 instead of scattered module globals, and the app is built by create_app() so
 importing this file has no hardware side effects.
 """
+import ipaddress
 import logging
 import os
 import threading
@@ -16,7 +17,19 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 import config
-from utilities import camera, motion, sensehat_utils, timelapse, visits, weather
+from utilities import (camera, motion, sensehat_utils, timelapse, usb_camera, visits,
+                       weather)
+
+# /api/snap answers only the home LAN (and the Pi itself), whatever else can reach :5000.
+SNAP_NETWORKS = [ipaddress.ip_network("10.0.0.0/24"), ipaddress.ip_network("127.0.0.0/8")]
+
+# The menu GET /api/snap returns. Timings measured on the Pi 3, 2026-10-22.
+SNAP_MODES = {
+    "noir": {"fast": "1080p frame from the live stream, near-instant",
+             "max": "2592x1944 full sensor, ~2 s"},
+    "usb": {"fast": "1080p newest frame from the running stream, near-instant",
+            "max": "largest mode the webcam has (C922: 2304x1536), ~19 s"},
+}
 
 
 class BirdCam:
@@ -25,6 +38,7 @@ class BirdCam:
     def __init__(self):
         config.MEDIA_DIR.mkdir(exist_ok=True)
         self.camera = camera.get_camera()
+        self.usb = usb_camera.get_stream()
         self.motion = motion.MotionDetector()
         self.last_motion_capture = None
         self.last_motion_time = 0.0
@@ -61,6 +75,16 @@ class BirdCam:
         name = Path(self.camera.capture_photo(self._media_path(".jpg"))).name
         sensehat_utils.show_photo_success()
         return name
+
+    def snap(self, cam, biggest=False):
+        """Still from 'noir' (Pi camera) or 'usb'. Default is the newest live frame
+        (1080p, near-instant); biggest=True is the camera's largest mode (seconds)."""
+        path = self._media_path(f"_snap_{cam}{'_max' if biggest else ''}.jpg")
+        if cam == "noir":
+            (self.camera.capture_full_photo if biggest else self.camera.capture_photo)(path)
+        else:
+            (self.usb.capture_max if biggest else self.usb.capture_photo)(path)
+        return Path(path).name
 
     def start_recording(self):
         if not self.camera.start_recording(self._media_path(".mp4")):
@@ -310,6 +334,50 @@ def create_app(bc=None):
             return jsonify(success=False, message="Nothing to say")
         sensehat_utils.scroll_text(text[:64])
         return jsonify(success=True, message=f"Scrolling: {text[:64]}")
+
+    def _from_lan():
+        try:
+            peer = ipaddress.ip_address(request.remote_addr or "")
+        except ValueError:
+            return False
+        return any(peer in net for net in SNAP_NETWORKS)
+
+    @app.route("/api/snap")
+    def api_snap_menu():
+        """What /api/snap/<cam>?mode= offers, so a caller can pick. LAN only."""
+        if not _from_lan():
+            return jsonify(success=False, message="home network only"), 403
+        return jsonify(success=True, cameras=list(SNAP_MODES), modes=SNAP_MODES,
+                       default="fast")
+
+    @app.route("/api/snap/<cam>")
+    def api_snap(cam):
+        """Return a photo from a camera as JPEG. LAN only.
+
+        ?mode=fast (default) is the newest live frame: a bird or a trick-or-treater
+        is gone in seconds. ?mode=max is the camera's biggest picture, which takes
+        seconds. A GET on purpose, so a browser tab or curl on any home machine
+        can fire it.
+        """
+        if not _from_lan():
+            return jsonify(success=False, message="home network only"), 403
+        if cam not in SNAP_MODES:
+            return jsonify(success=False, message=f"camera is one of {list(SNAP_MODES)}"), 404
+        mode = request.args.get("mode", "fast")
+        if mode not in SNAP_MODES[cam]:
+            return jsonify(success=False, message=f"mode is one of {list(SNAP_MODES[cam])}",
+                           modes=SNAP_MODES[cam]), 400
+        try:
+            name = bc.snap(cam, biggest=mode == "max")
+        except Exception as e:
+            app.logger.error("snap %s: %s", cam, e)
+            return jsonify(success=False, message=str(e)), 503
+        # The JPEG is the body; the saved copy's link rides along so a caller can
+        # fetch it again later (it also shows in the gallery / /api/list_files).
+        resp = send_from_directory(config.MEDIA_DIR, name, mimetype="image/jpeg")
+        resp.headers["X-Snap-File"] = name
+        resp.headers["X-Snap-Url"] = f"{request.host_url}files/{name}"
+        return resp
 
     @app.route("/files/<path:filename>")
     def serve_file(filename):

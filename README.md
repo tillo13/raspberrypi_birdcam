@@ -20,6 +20,8 @@ couch.
 - **Conditions** — Sense HAT temperature / humidity / pressure on the dashboard and
   stamped onto every visit, so you can ask when birds actually turn up.
 - **Manual photo & video** — one-tap capture and recording (video written to mp4).
+- **Snapshot API** - any machine on your LAN can grab a photo from either camera with
+  one GET: the newest live frame by default (fast), or the camera's biggest still on request.
 - **Timelapse** — assemble a day's stills into a clip with ffmpeg, in the background.
 - **Sense HAT LED matrix** — countdowns, status animations, and scrolling text.
 - **Web control panel** — start/stop motion, tune settings, and browse captures from
@@ -29,6 +31,8 @@ couch.
 - Raspberry Pi (developed on a Pi 3, Raspberry Pi OS **Bookworm**, 32-bit)
 - **Raspberry Pi Camera Module v1 — NoIR (`ov5647`)**
 - Sense HAT
+- Optional: any USB (UVC) webcam, for the snapshot API (tested with a Logitech C922 Pro
+  Stream). It's found by USB bus, so no config names the model.
 
 > **Two camera assumptions are baked into `utilities/camera.py`.** Both are one-line
 > changes at the top of that file, and both will look like bugs if your setup differs:
@@ -89,12 +93,49 @@ assuming the port is up.
 **Conditions** `/api/weather`
 **Timelapse** `/api/timelapse` (POST) · `/api/timelapse_status`
 **Sense HAT** `/api/say` (POST) · `/api/test_countdown` · `/api/force_random_display`
+**Snapshot** `/api/snap` (menu) · `/api/snap/<noir|usb>?mode=<fast|max>`
+
+### Snapshot API
+Take a photo from any machine on the home network, from a browser tab or `curl`:
+
+```bash
+curl http://<pi>:5000/api/snap                         # cameras + modes, as JSON
+curl -o bird.jpg http://<pi>:5000/api/snap/usb          # fast (default)
+curl -o bird.jpg "http://<pi>:5000/api/snap/noir?mode=max"
+```
+
+| camera | `fast` (default) | `max` |
+|---|---|---|
+| `noir` (Pi camera) | 1080p frame from the live stream, ~1 s | full sensor 2592x1944, ~2.4 s |
+| `usb` (webcam) | newest frame of a running 1080p 15 fps stream, ~0.2 s | the webcam's largest mode (C922: 2304x1536), 11-19 s |
+
+Timings measured on a Pi 3 over Wi-Fi, 2026-10-22.
+
+- **Why fast is the default:** a bird is gone in a second. Opening a webcam cold costs
+  2-5 s before the first frame (as of 2026-10-22 on a Pi 3: ffmpeg start 1.9 s, first
+  2304x1536 frame 5.1 s), so `usb` keeps a stream open and hands back its newest frame.
+  The webcam already JPEG-encodes its MJPEG frames, so holding them needs no decode.
+- **`max` on `usb`** pauses that stream for the capture; a `fast` call right after waits
+  up to 6 s for it to come back rather than failing.
+- **Getting it again later:** the response body is the JPEG. Each snap is also saved to
+  `media/<timestamp>_snap_<cam>[_max].jpg`; the `X-Snap-File` and `X-Snap-Url` headers
+  point at the saved copy (served by `/files/<name>`, listed by `/api/list_files`).
+- **Who can call it:** only addresses in `SNAP_NETWORKS` at the top of `app.py`
+  (default `10.0.0.0/24` plus the Pi itself) get a photo; anyone else gets 403. Set it to
+  your LAN's range. It's a GET on purpose so a browser tab works; the rest of the app is
+  not restricted, so keep port 5000 off the internet.
+- **Errors:** 404 unknown camera, 400 unknown mode (the body lists the valid ones), 503
+  camera unavailable (webcam unplugged, or `noir` `max` during a motion clip).
+- **Focus:** the webcam runs continuous autofocus, which locks onto a window screen a few
+  inches away instead of the yard. Remove the screen, or pin focus with
+  `v4l2-ctl -c focus_automatic_continuous=0 -c focus_absolute=0` (resets on replug).
 
 ## Layout
 ```
 app.py                      Flask app + JSON API + MJPEG stream (waitress)
 config.py                   paths, port, motion/visit/weather/timelapse defaults
 utilities/camera.py         persistent picamera2 camera (frames, photo, video, stream)
+utilities/usb_camera.py     USB webcam: always-on 1080p stream + largest-mode stills
 utilities/motion.py         MOG2 motion detection
 utilities/visits.py         motion captures -> visits + hourly histogram
 utilities/weather.py        Sense HAT conditions, corrected for CPU heat

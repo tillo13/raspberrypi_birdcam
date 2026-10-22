@@ -118,6 +118,22 @@ class Camera:
         cv2.imwrite(path, self._orient(frame))
         return path
 
+    def capture_full_photo(self, path):
+        """Full-sensor still (2592x1944 on the OV5647), not the 1080p video main.
+
+        switch_mode_and_capture_array drops into a still config for one frame and
+        restores the video config, so the lores loop just waits on the lock. It
+        can't happen mid-recording: the encoder owns the video config then.
+        """
+        if self._recording:
+            raise RuntimeError("camera is recording; try again when it stops")
+        with self._cam_lock:
+            cfg = self._picam.create_still_configuration(
+                main={"size": self._picam.sensor_resolution, "format": "RGB888"})
+            frame = self._picam.switch_mode_and_capture_array(cfg, "main")
+        cv2.imwrite(path, self._orient(frame), [cv2.IMWRITE_JPEG_QUALITY, 95])
+        return path
+
     def start_recording(self, path):
         """Begin recording the main stream straight to mp4 (no temp .h264 + ffmpeg)."""
         if self._recording:
