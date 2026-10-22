@@ -344,11 +344,15 @@ def create_app(bc=None):
 
     @app.route("/api/snap")
     def api_snap_menu():
-        """What /api/snap/<cam>?mode= offers, so a caller can pick. LAN only."""
+        """What /api/snap/<cam>?mode= offers and which cameras are there right now.
+        The webcam comes and goes (unplugged, switched off), so 'available' is a live
+        check, not config. LAN only."""
         if not _from_lan():
             return jsonify(success=False, message="home network only"), 403
-        return jsonify(success=True, cameras=list(SNAP_MODES), modes=SNAP_MODES,
-                       default="fast")
+        cameras = {"noir": {"available": True, "name": "Pi Camera (NoIR)",
+                            "modes": SNAP_MODES["noir"]},
+                   "usb": {**bc.usb.status(), "modes": SNAP_MODES["usb"]}}
+        return jsonify(success=True, cameras=cameras, default="fast")
 
     @app.route("/api/snap/<cam>")
     def api_snap(cam):
@@ -369,6 +373,8 @@ def create_app(bc=None):
                            modes=SNAP_MODES[cam]), 400
         try:
             name = bc.snap(cam, biggest=mode == "max")
+        except usb_camera.NotPluggedIn as e:
+            return jsonify(success=False, available=False, message=str(e)), 503
         except Exception as e:
             app.logger.error("snap %s: %s", cam, e)
             return jsonify(success=False, message=str(e)), 503

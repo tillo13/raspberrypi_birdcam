@@ -28,6 +28,10 @@ _FFMPEG_FORMATS = {"YUYV": "yuyv422", "MJPG": "mjpeg"}
 _SOI = b"\xff\xd8\xff"
 
 
+class NotPluggedIn(RuntimeError):
+    """No USB camera on the bus right now (it comes and goes)."""
+
+
 def find_device():
     """(first /dev/video node, name) of the first USB camera, or None."""
     out = subprocess.run(["v4l2-ctl", "--list-devices"],
@@ -82,6 +86,7 @@ class UsbStream:
                 continue
             found = find_device()
             if not found:
+                self._name = None
                 time.sleep(RETRY_SECONDS)
                 continue
             dev, self._name = found
@@ -99,6 +104,8 @@ class UsbStream:
                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             self._read(self._proc)
             self._proc.wait()
+            with self._frame_lock:
+                self._latest = None    # unplugged or stopped: nothing current to serve
             if not self._paused.is_set():
                 time.sleep(RETRY_SECONDS)
 
@@ -125,9 +132,11 @@ class UsbStream:
     def capture_photo(self, path):
         """Newest streamed frame (1080p) to path, near-instant.
 
-        Right after a max capture or a replug the stream takes a few seconds to
-        come back, so wait that long for a fresh frame rather than failing.
+        Unplugged fails at once. Right after a max capture or a replug the stream
+        takes a few seconds to come back, so wait that long for a fresh frame.
         """
+        if not find_device():
+            raise NotPluggedIn("no USB camera plugged in")
         deadline = time.time() + FRESH_WAIT_SECONDS
         while True:
             with self._frame_lock:
@@ -150,7 +159,7 @@ class UsbStream:
             with self._device_lock:
                 found = find_device()
                 if not found:
-                    raise RuntimeError("no USB camera plugged in")
+                    raise NotPluggedIn("no USB camera plugged in")
                 dev, name = found
                 mode = largest_mode(dev)
                 if not mode:
@@ -168,6 +177,15 @@ class UsbStream:
                 self._latest = None    # don't serve a pre-pause frame as fresh
             self._paused.clear()
         return path
+
+    def status(self):
+        """Live check for the snap menu: is a webcam plugged in, and is it streaming."""
+        found = find_device()
+        with self._frame_lock:
+            latest = self._latest
+        fresh = latest is not None and time.time() - latest[0] <= STALE_SECONDS
+        return {"available": bool(found), "name": found[1] if found else None,
+                "streaming": bool(found) and fresh}
 
 
 _stream = None
