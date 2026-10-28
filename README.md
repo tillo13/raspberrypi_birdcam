@@ -8,6 +8,8 @@ The goal: turn a Pi, a camera, and a Sense HAT into a tiny always-on nature stat
 Reliable motion capture with few false triggers, light enough to run 24/7 on a Pi 3, and
 simple enough to check from your phone on the couch.
 
+Once a year it moonlights as a haunted walkway; see [Halloween ghost mode](#halloween-ghost-mode-seasonal).
+
 ## Quick start
 ```bash
 # Raspberry Pi OS Bookworm
@@ -161,6 +163,53 @@ static/css/                 style.css (tokens, dark mode) and motion.css
 static/js/                  birds.js, motion.js, weather.js, visits.js
 birdcam.service             systemd unit
 ```
+
+## Halloween ghost mode (seasonal)
+
+For one week a year the bird feeder cam becomes a haunted walkway. Same Pi, same motion
+detector, one extra reaction: when something walks up the path after dark, a ghost talks
+to it through a Google Home Mini hidden near the door. Plan and status: kumori task #488
+(party 2026-10-31). As of 2026-10-27 the hardware works and the trigger is not yet wired.
+
+**How it hangs together**
+- **Trigger**: `BirdCam._on_motion` in `app.py`, the same hook that saves a bird capture.
+  Ghost mode adds a second listener; it never replaces the capture, so every trick-or-treater
+  is also in the gallery the next morning.
+- **Voice**: the Pi 3 is armv7 and cannot run a TTS model, so lines are rendered ahead of
+  time on a bigger machine (Kokoro voice, slowed, then an ffmpeg echo chain for the
+  "down a well" sound) and copied to `pool/*.wav` on the Pi. The lines and wavs are not in
+  this repo; the ghost keeps its own secrets.
+- **Speaker**: a repurposed Google Home Mini on the LAN, played through a Cast client. One
+  clip per visitor, picked at random with no repeats until the pool is used up, then a
+  45-60 s cooldown so one kid standing on the mat does not get a monologue.
+- **Face**: the Sense HAT LED matrix. Motion scrolls `BOO`, and a nightly visitor count
+  replaces the usual temperature once the sun is down.
+- **Power**: both the Pi and the Mini currently hang off a PC's USB ports and the Pi reports
+  under-voltage. Wall supplies before the party, or the ghost dies mid-sentence.
+
+**Ideas, in rough order of effort**
+- **Two-stage scare.** First motion at the gate gets a whisper ("I see you... coming up the
+  walk"); motion at the door, 10 s later, gets the loud one. Two zones in the MOG2 mask, two
+  pools.
+- **Costume commentary.** Snap the visitor with `/api/snap/usb`, send it to a vision model,
+  and have the ghost say one line about what it sees: "a very small dinosaur... how brave."
+  This is the Name-what-it-saw idea below with a sheet over it. Off-thread, once per visit,
+  with a canned fallback line when the model is slow.
+- **Candy bowl guard.** A second cheap motion zone on the bowl itself. One hand, silence.
+  A second grab inside 5 s: "the house is counting."
+- **Visitor leaderboard.** The visits page already groups motion into events; add a
+  Halloween view that counts groups per hour, biggest group, latest visitor, and the pool
+  line each one got. Screenshot it for the group chat at midnight.
+- **Ghost cam feed.** Mirror the live view to a TV in the window with a slow ghost overlay
+  (CSS, no GPU needed) so the kids see themselves being watched on the way up.
+- **Thunder on demand.** `/api/say` already exists for the matrix; a `/api/haunt/<clip>` route
+  lets a phone on the couch fire any clip by hand when the automatic one misses.
+- **Fog cue.** A smart plug on a fog machine toggled from the same hook, 3 s before the voice,
+  so the line arrives out of the fog instead of before it.
+- **Quiet hours and an off switch.** Ghost mode arms at dusk, disarms at 21:30, and the
+  Sense HAT joystick press kills it instantly for the one kid who is genuinely scared.
+- **Morning-after reel.** The timelapse worker can stitch every night capture into a 30 s
+  clip at 7 a.m. The bird cam already knows how; it just needs a date filter.
 
 ## Ideas
 - **Name what it saw.** A capture can be described by a vision model and the word scrolled
