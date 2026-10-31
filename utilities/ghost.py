@@ -36,6 +36,7 @@ class Ghost:
         self.played_tonight = 0
         self.last_error = None
         self.enabled = config.GHOST_ENABLED
+        self.all_day = False  # test switch: ignore GHOST_HOURS until the app restarts
 
     def clips(self):
         if not config.GHOST_POOL_DIR.exists():
@@ -47,7 +48,7 @@ class Ghost:
         return start <= (now or datetime.now()).hour < end
 
     def armed(self):
-        return self.enabled and self.in_hours() and bool(self.clips())
+        return self.enabled and (self.all_day or self.in_hours()) and bool(self.clips())
 
     def cooling(self):
         return time.time() - self.last_played < config.GHOST_COOLDOWN_SECONDS
@@ -120,7 +121,7 @@ class Ghost:
 
     def status(self):
         return {"enabled": self.enabled, "armed": self.armed(), "in_hours": self.in_hours(),
-                "hours": list(config.GHOST_HOURS), "cooling": self.cooling(),
+                "hours": list(config.GHOST_HOURS), "all_day": self.all_day, "cooling": self.cooling(),
                 "cooldown_s": config.GHOST_COOLDOWN_SECONDS, "clips": len(self.clips()),
                 "played": self.played_tonight, "last_clip": self.last_clip,
                 "last_error": self.last_error, "speaker": config.GHOST_SPEAKER_NAME}

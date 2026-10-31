@@ -413,7 +413,9 @@ def create_app(bc=None):
 
     @app.route("/api/haunt/enabled", methods=["POST"])
     def api_haunt_enabled():
-        bc.ghost.enabled = bool((request.json or {}).get("on"))
+        body = request.json or {}
+        bc.ghost.enabled = bool(body.get("on"))
+        bc.ghost.all_day = bool(body.get("all_day"))  # {"on":true,"all_day":true} = test it at noon
         return jsonify(success=True, **bc.ghost.status())
 
     @app.route("/ghost/<path:filename>")

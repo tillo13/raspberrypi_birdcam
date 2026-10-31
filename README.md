@@ -177,6 +177,7 @@ curl http://<pi>:5000/api/haunt                      # armed? cooling? lines pla
 curl http://<pi>:5000/api/haunt/play                 # fire the next line now (LAN only; a phone bookmark works)
 curl "http://<pi>:5000/api/haunt/play?clip=08.mp3"   # a specific one
 curl -X POST -H 'Content-Type: application/json' -d '{"on":false}' http://<pi>:5000/api/haunt/enabled   # off switch
+curl -X POST -H 'Content-Type: application/json' -d '{"on":true,"all_day":true}' http://<pi>:5000/api/haunt/enabled   # test outside the hours (until restart)
 python tools/render_ghost_pool.py lines.txt          # lines -> ghost/pool/NN.mp3 (Kokoro venv), then copy to the Pi
 ```
 
