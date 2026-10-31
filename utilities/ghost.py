@@ -7,6 +7,7 @@ One line per visitor: a shuffled bag (no repeat until all have played), then a c
 import logging
 import random
 import socket
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -36,6 +37,8 @@ class Ghost:
         self.played_tonight = 0
         self.last_error = None
         self.enabled = config.GHOST_ENABLED
+        self._lengths = {}
+        self._quiet_until = 0.0
         self.all_day = False  # test switch: ignore GHOST_HOURS until the app restarts
 
     def clips(self):
@@ -50,8 +53,21 @@ class Ghost:
     def armed(self):
         return self.enabled and (self.all_day or self.in_hours()) and bool(self.clips())
 
+    def _length(self, clip):
+        """Seconds of audio in a clip (ffprobe once, then cached); 15 s if it can't tell."""
+        if clip not in self._lengths:
+            try:
+                out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                      "-of", "csv=p=0", str(config.GHOST_POOL_DIR / clip)],
+                                     capture_output=True, text=True, timeout=10).stdout
+                self._lengths[clip] = float(out.strip())
+            except Exception:
+                self._lengths[clip] = 15.0
+        return self._lengths[clip]
+
     def cooling(self):
-        return time.time() - self.last_played < config.GHOST_COOLDOWN_SECONDS
+        """Quiet only while the current line is still playing, plus GHOST_COOLDOWN_SECONDS."""
+        return time.time() < self._quiet_until
 
     def _next_clip(self):
         if not self._bag:
@@ -104,6 +120,7 @@ class Ghost:
             elif clip not in clips:
                 raise ValueError(f"no clip {clip!r}")
             self.last_played = time.time()
+            self._quiet_until = self.last_played + self._length(clip) + config.GHOST_COOLDOWN_SECONDS
             self.last_clip = clip
             self.played_tonight += 1
 
