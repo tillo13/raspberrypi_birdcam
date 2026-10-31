@@ -32,4 +32,5 @@ GHOST_COOLDOWN_SECONDS = 45     # quiet time after a line, so one kid on the mat
 GHOST_POOL_DIR = BASE_DIR / "ghost" / "pool"
 GHOST_SPEAKER_NAME = "Goodwin room speaker"
 GHOST_SPEAKER_IP = "10.0.0.219"
+GHOST_SPEAKER_UUID = "5b3cdfa1-ea7d-79a1-ed08-cc76d500f7bc"
 GHOST_VOLUME = 0.8

@@ -63,16 +63,16 @@ class Ghost:
         return self._bag.pop()
 
     def _speaker(self):
+        # Straight to the speaker's IP, no mDNS: stopping a discovery browser while the
+        # connection still resolved through it raised AssertionError in zeroconf (2026-10-31).
         if self._cast is None:
+            import uuid
             import pychromecast
-            casts, browser = pychromecast.get_listed_chromecasts(
-                friendly_names=[config.GHOST_SPEAKER_NAME],
-                known_hosts=[config.GHOST_SPEAKER_IP], discovery_timeout=5)
-            browser.stop_discovery()
-            if not casts:
-                raise RuntimeError(f"speaker {config.GHOST_SPEAKER_NAME!r} not found")
-            casts[0].wait(timeout=10)
-            self._cast = casts[0]
+            cc = pychromecast.get_chromecast_from_host(
+                (config.GHOST_SPEAKER_IP, 8009, uuid.UUID(config.GHOST_SPEAKER_UUID),
+                 "Google Home Mini", config.GHOST_SPEAKER_NAME))
+            cc.wait(timeout=10)
+            self._cast = cc
         return self._cast
 
     def _play(self, clip):
