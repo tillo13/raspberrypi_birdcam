@@ -9,6 +9,7 @@ HOST = "0.0.0.0"
 PORT = 5000
 
 MOTION_RECORD_SECONDS = 10      # length of a motion-triggered clip
+MOTION_CAMERA = "usb"           # which camera motion watches: "noir" (ribbon, sees in low light) or "usb" (webcam)
 RANDOM_DISPLAY_INTERVAL = 300   # seconds between Sense HAT idle animations
 
 # --- Visits (motion captures grouped into bird visits) ---

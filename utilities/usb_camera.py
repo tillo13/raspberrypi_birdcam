@@ -129,6 +129,17 @@ class UsbStream:
                 del buf[:nxt]
                 nxt = buf.find(_SOI, 3)
 
+    def latest_gray(self):
+        """Newest frame as small grayscale for motion detection (1080p decoded at 1/4 = 480x270),
+        or None when the stream is down. Same contract as camera.Camera.latest_gray."""
+        import cv2
+        import numpy as np
+        with self._frame_lock:
+            latest = self._latest
+        if latest is None or time.time() - latest[0] > STALE_SECONDS:
+            return None
+        return cv2.imdecode(np.frombuffer(latest[1], np.uint8), cv2.IMREAD_REDUCED_GRAYSCALE_4)
+
     def capture_photo(self, path):
         """Newest streamed frame (1080p) to path, near-instant.
 

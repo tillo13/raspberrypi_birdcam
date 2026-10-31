@@ -10,7 +10,9 @@ import time
 
 import cv2
 
+import config
 from utilities import camera as camera_mod
+from utilities import usb_camera
 
 DEFAULTS = {
     "threshold": 25,          # MOG2 varThreshold — higher = less sensitive
@@ -67,7 +69,8 @@ class MotionDetector:
             return {**self._settings, "is_active": self._active}
 
     def _loop(self):
-        cam = camera_mod.get_camera()
+        cam = (usb_camera.get_stream() if config.MOTION_CAMERA == "usb"
+               else camera_mod.get_camera())
         bg = cv2.createBackgroundSubtractorMOG2(
             history=300, varThreshold=self._settings["threshold"], detectShadows=False)
         streak = 0

@@ -119,7 +119,8 @@ class BirdCam:
         # The ghost goes first (off-thread): the line should land while they're still on the walk.
         if self.ghost.haunt():
             sensehat_utils.scroll_text("BOO")
-        name = Path(self.camera.capture_photo(self._media_path("_motion.jpg"))).name
+        cam = self.usb if config.MOTION_CAMERA == "usb" else self.camera
+        name = Path(cam.capture_photo(self._media_path("_motion.jpg"))).name
         self.last_motion_capture = name
         self.last_motion_time = time.time()
         visits.log_event(name, weather.read())
