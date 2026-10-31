@@ -27,7 +27,7 @@ TIMELAPSE_MAX_FRAMES = 600      # ~50s of output at 12fps; bounds Pi 3 encode ti
 
 # --- Halloween ghost mode (utilities/ghost.py) ---
 GHOST_ENABLED = True            # also starts motion detection at boot, so a reboot re-arms it
-GHOST_HOURS = (17, 22)          # local hours the walkway talks: 17:00 to 21:59
+GHOST_HOURS = (0, 24)           # local hours it may talk; (0, 24) = whenever it is plugged in (Andy, 2026-10-31)
 GHOST_COOLDOWN_SECONDS = 45     # quiet time after a line, so one kid on the mat isn't a monologue
 GHOST_POOL_DIR = BASE_DIR / "ghost" / "pool"
 GHOST_SPEAKER_NAME = "Goodwin room speaker"
