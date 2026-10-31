@@ -124,7 +124,8 @@ class BirdCam:
         self.last_motion_capture = name
         self.last_motion_time = time.time()
         visits.log_event(name, weather.read())
-        self._start_motion_clip()
+        if config.MOTION_CAMERA == "noir":  # clips record from the ribbon camera only
+            self._start_motion_clip()
 
     def _start_motion_clip(self):
         """Record the seconds after a trigger, unless something already has the encoder.
