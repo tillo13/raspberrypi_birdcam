@@ -264,7 +264,9 @@ def create_app(bc=None):
     def motion_status():
         return jsonify(success=True, is_active=bc.motion.active,
                        last_capture=bc.last_motion_capture,
-                       last_capture_time=bc.last_motion_time)
+                       last_capture_time=bc.last_motion_time,
+                       camera=config.MOTION_CAMERA, **bc.motion.stats,
+                       settings=bc.motion.get_settings())
 
     @app.route("/api/motion_settings", methods=["GET", "POST"])
     def motion_settings():

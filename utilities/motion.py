@@ -31,6 +31,8 @@ class MotionDetector:
         self._active = False
         self._on_motion = None
         self._last_trigger = 0.0
+        # live diagnostics for /api/motion_status: is it getting frames, and how big is what moves?
+        self.stats = {"samples_per_s": 0.0, "biggest_blob": 0, "triggers": 0}
 
     def start(self, on_motion):
         with self._lock:
@@ -75,6 +77,7 @@ class MotionDetector:
             history=300, varThreshold=self._settings["threshold"], detectShadows=False)
         streak = 0
         seen = 0
+        window_start, window_n, window_big = time.time(), 0, 0
         while self._active:
             time.sleep(SAMPLE_INTERVAL)
             gray = cam.latest_gray()
@@ -89,13 +92,21 @@ class MotionDetector:
                 continue
             contours, _ = cv2.findContours(
                 mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            moved = any(cv2.contourArea(c) >= s["min_area"] for c in contours)
+            biggest = max((cv2.contourArea(c) for c in contours), default=0)
+            moved = biggest >= s["min_area"]
+            window_n += 1
+            window_big = max(window_big, int(biggest))
+            if time.time() - window_start >= 2.0:   # refresh the stats every 2 s
+                self.stats["samples_per_s"] = round(window_n / (time.time() - window_start), 1)
+                self.stats["biggest_blob"] = window_big
+                window_start, window_n, window_big = time.time(), 0, 0
             streak = streak + 1 if moved else 0
             now = time.time()
             if (streak >= s["consecutive_frames"]
                     and now - self._last_trigger >= s["cooldown"]):
                 self._last_trigger = now
                 streak = 0
+                self.stats["triggers"] += 1
                 if self._on_motion:
                     try:
                         self._on_motion()
