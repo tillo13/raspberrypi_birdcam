@@ -17,7 +17,7 @@ from pathlib import Path
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 import config
-from utilities import (camera, motion, sensehat_utils, timelapse, usb_camera, visits,
+from utilities import (camera, ghost, motion, sensehat_utils, timelapse, usb_camera, visits,
                        weather)
 
 # /api/snap answers only the home LAN (and the Pi itself), whatever else can reach :5000.
@@ -46,9 +46,12 @@ class BirdCam:
         self._clip_lock = threading.Lock()
         self._clip_active = False
         self._display_on = True
+        self.ghost = ghost.Ghost()
         sensehat_utils.clear_display()
         sensehat_utils.show_startup_message()
         threading.Thread(target=self._display_loop, daemon=True).start()
+        if config.GHOST_ENABLED:
+            self.start_motion()  # a brownout reboot must come back haunting, not idle
 
     def _display_loop(self):
         while self._display_on:
@@ -113,6 +116,9 @@ class BirdCam:
         return False
 
     def _on_motion(self):
+        # The ghost goes first (off-thread): the line should land while they're still on the walk.
+        if self.ghost.haunt():
+            sensehat_utils.scroll_text("BOO")
         name = Path(self.camera.capture_photo(self._media_path("_motion.jpg"))).name
         self.last_motion_capture = name
         self.last_motion_time = time.time()
@@ -384,6 +390,35 @@ def create_app(bc=None):
         resp.headers["X-Snap-File"] = name
         resp.headers["X-Snap-Url"] = f"{request.host_url}files/{name}"
         return resp
+
+    @app.route("/api/haunt")
+    def api_haunt_status():
+        return jsonify(success=True, **bc.ghost.status(), clip_names=bc.ghost.clips())
+
+    @app.route("/api/haunt/play")
+    def api_haunt_play():
+        """Fire a line now, ignoring hours and cooldown: the couch button for when motion
+        misses. ?clip=07.mp3 picks one, otherwise the next from the bag. A GET on purpose
+        (a phone bookmark works), so LAN only, like /api/snap."""
+        if not _from_lan():
+            return jsonify(success=False, message="home network only"), 403
+        try:
+            clip = bc.ghost.haunt(request.args.get("clip"), force=True)
+        except ValueError as e:
+            return jsonify(success=False, message=str(e)), 404
+        if not clip:
+            return jsonify(success=False, message="no clips in ghost/pool"), 503
+        sensehat_utils.scroll_text("BOO")
+        return jsonify(success=True, clip=clip)
+
+    @app.route("/api/haunt/enabled", methods=["POST"])
+    def api_haunt_enabled():
+        bc.ghost.enabled = bool((request.json or {}).get("on"))
+        return jsonify(success=True, **bc.ghost.status())
+
+    @app.route("/ghost/<path:filename>")
+    def serve_ghost(filename):
+        return send_from_directory(config.GHOST_POOL_DIR, filename, mimetype="audio/mpeg")
 
     @app.route("/files/<path:filename>")
     def serve_file(filename):

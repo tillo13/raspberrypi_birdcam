@@ -31,3 +31,6 @@ app copy.py
 _recovered_extras/
 _oneoff/
 next_steps.md
+
+# Ghost mode lines + rendered clips (kept off the public repo)
+ghost/

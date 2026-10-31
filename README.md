@@ -169,7 +169,16 @@ birdcam.service             systemd unit
 For one week a year the bird feeder cam becomes a haunted walkway. Same Pi, same motion
 detector, one extra reaction: when something walks up the path after dark, a ghost talks
 to it through a Google Home Mini hidden near the door. Plan and status: kumori task #488
-(party 2026-10-31). As of 2026-10-27 the hardware works and the trigger is not yet wired.
+(party 2026-10-31). Wired 2026-10-31: `utilities/ghost.py`, settings under "Halloween ghost
+mode" in `config.py` (hours, cooldown, speaker, volume).
+
+```bash
+curl http://<pi>:5000/api/haunt                      # armed? cooling? lines played, last error
+curl http://<pi>:5000/api/haunt/play                 # fire the next line now (LAN only; a phone bookmark works)
+curl "http://<pi>:5000/api/haunt/play?clip=08.mp3"   # a specific one
+curl -X POST -H 'Content-Type: application/json' -d '{"on":false}' http://<pi>:5000/api/haunt/enabled   # off switch
+python tools/render_ghost_pool.py lines.txt          # lines -> ghost/pool/NN.mp3 (Kokoro venv), then copy to the Pi
+```
 
 **How it hangs together**
 - **Trigger**: `BirdCam._on_motion` in `app.py`, the same hook that saves a bird capture.
