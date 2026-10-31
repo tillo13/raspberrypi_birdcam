@@ -181,6 +181,12 @@ curl -X POST -H 'Content-Type: application/json' -d '{"on":true,"all_day":true}'
 python tools/render_ghost_pool.py lines.txt          # lines -> ghost/pool/NN.mp3 (Kokoro venv), then copy to the Pi
 ```
 
+Which camera watches is `MOTION_CAMERA` in `config.py`: `noir` (the ribbon camera, sees in low light) or `usb`
+(a webcam on a long cord, easier to aim at a walk; needs the porch light). `/api/motion_status` reports the camera,
+samples per second, the biggest moving blob in pixels and the trigger count, for aiming and tuning `min_area`.
+Measured 2026-10-31 on the webcam: 4.5 samples/s on an under-volted Pi 3, a person at 6 to 10 ft = 700 to 900 px,
+sensor noise 1 to 6 px. Motion during a line queues the next one (one slot), so it keeps talking while people keep coming.
+
 **How it hangs together**
 - **Trigger**: `BirdCam._on_motion` in `app.py`, the same hook that saves a bird capture.
   Ghost mode adds a second listener; it never replaces the capture, so every trick-or-treater
