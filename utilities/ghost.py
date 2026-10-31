@@ -39,6 +39,7 @@ class Ghost:
         self.enabled = config.GHOST_ENABLED
         self._lengths = {}
         self._quiet_until = 0.0
+        self._pending = False  # motion seen while a line played: play the next when it ends
         self.all_day = False  # test switch: ignore GHOST_HOURS until the app restarts
 
     def clips(self):
@@ -110,7 +111,10 @@ class Ghost:
         """Play a line now (off-thread). Motion calls this; force skips hours + cooldown.
         Returns the clip chosen, or None when skipped."""
         with self._lock:
-            if not force and (not self.armed() or self.cooling()):
+            if not force and not self.armed():
+                return None
+            if not force and self.cooling():
+                self._pending = True   # one slot, not a backlog: motion stops, at most one more line
                 return None
             clips = self.clips()
             if not clips:
@@ -121,6 +125,8 @@ class Ghost:
                 raise ValueError(f"no clip {clip!r}")
             self.last_played = time.time()
             self._quiet_until = self.last_played + self._length(clip) + config.GHOST_COOLDOWN_SECONDS
+            self._pending = False
+            wait = self._quiet_until - time.time()
             self.last_clip = clip
             self.played_tonight += 1
 
@@ -134,11 +140,19 @@ class Ghost:
                 log.error("ghost failed: %s", e)
 
         threading.Thread(target=run, daemon=True).start()
+        threading.Timer(wait + 0.2, self._next_if_pending).start()
         return clip
+
+    def _next_if_pending(self):
+        """When a line ends: if anyone moved during it, keep going."""
+        with self._lock:
+            go = self._pending and not self.cooling()
+        if go:
+            self.haunt()
 
     def status(self):
         return {"enabled": self.enabled, "armed": self.armed(), "in_hours": self.in_hours(),
                 "hours": list(config.GHOST_HOURS), "all_day": self.all_day, "cooling": self.cooling(),
                 "cooldown_s": config.GHOST_COOLDOWN_SECONDS, "clips": len(self.clips()),
-                "played": self.played_tonight, "last_clip": self.last_clip,
+                "played": self.played_tonight, "pending": self._pending, "last_clip": self.last_clip,
                 "last_error": self.last_error, "speaker": config.GHOST_SPEAKER_NAME}
